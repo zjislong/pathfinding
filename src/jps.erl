@@ -284,7 +284,8 @@ dir_lookup(southwest) -> [west, southwest, south].
 search([], _, _, _, Success) -> Success;
 search([east|Dirs], CurNode, GoalNode, JpsMod, Success) ->
     Distance = get_distance_value(JpsMod, CurNode, east),
-    case is_in_direction(CurNode, GoalNode, Distance, east) of
+    DiffCol = diff_col(CurNode, GoalNode),
+    case is_in_direction(CurNode, GoalNode, east) andalso abs(Distance) >= DiffCol of
         true ->
             search(Dirs, CurNode, GoalNode, JpsMod, [GoalNode|Success]);
         false ->
@@ -298,7 +299,8 @@ search([east|Dirs], CurNode, GoalNode, JpsMod, Success) ->
     end;
 search([west|Dirs], CurNode, GoalNode, JpsMod, Success) ->
     Distance = get_distance_value(JpsMod, CurNode, west),
-    case is_in_direction(CurNode, GoalNode, Distance, west) of
+    DiffCol = diff_col(CurNode, GoalNode),
+    case is_in_direction(CurNode, GoalNode, west) andalso abs(Distance) >= DiffCol of
         true ->
             search(Dirs, CurNode, GoalNode, JpsMod, [GoalNode|Success]);
         false ->
@@ -312,7 +314,8 @@ search([west|Dirs], CurNode, GoalNode, JpsMod, Success) ->
     end;
 search([south|Dirs], CurNode, GoalNode, JpsMod, Success) ->
     Distance = get_distance_value(JpsMod, CurNode, south),
-    case is_in_direction(CurNode, GoalNode, Distance, south) of
+    DiffRow = diff_row(CurNode, GoalNode),
+    case is_in_direction(CurNode, GoalNode, south) andalso abs(Distance) >= DiffRow of
         true ->
             search(Dirs, CurNode, GoalNode, JpsMod, [GoalNode|Success]);
         false ->
@@ -326,7 +329,8 @@ search([south|Dirs], CurNode, GoalNode, JpsMod, Success) ->
     end;
 search([north|Dirs], CurNode, GoalNode,JpsMod,  Success) ->
     Distance = get_distance_value(JpsMod, CurNode, north),
-    case is_in_direction(CurNode, GoalNode, Distance, north) of
+    DiffRow = diff_row(CurNode, GoalNode),
+    case is_in_direction(CurNode, GoalNode, north) andalso abs(Distance) >= DiffRow of
         true ->
             search(Dirs, CurNode, GoalNode, JpsMod, [GoalNode|Success]);
         false ->
@@ -340,9 +344,11 @@ search([north|Dirs], CurNode, GoalNode,JpsMod,  Success) ->
     end;
 search([northeast|Dirs], CurNode, GoalNode, JpsMod, Success) ->
     Distance = get_distance_value(JpsMod, CurNode, northeast),
-    case is_in_direction(CurNode, GoalNode, Distance, northeast) of
+    DiffMin = diff_min(CurNode, GoalNode),
+    case is_in_direction(CurNode, GoalNode, northeast) andalso abs(Distance) >= DiffMin of
         true ->
-            search(Dirs, CurNode, GoalNode, JpsMod, [GoalNode|Success]);
+            NewSuccess = #node{x = CurNode#node.x + DiffMin, y = CurNode#node.y - DiffMin},
+            search(Dirs, CurNode, GoalNode, JpsMod, [NewSuccess|Success]);
         false ->
             case Distance > 0 of
                 true ->
@@ -354,9 +360,11 @@ search([northeast|Dirs], CurNode, GoalNode, JpsMod, Success) ->
     end;
 search([northwest|Dirs], CurNode, GoalNode, JpsMod, Success) ->
     Distance = get_distance_value(JpsMod, CurNode, northwest),
-    case is_in_direction(CurNode, GoalNode, Distance, northwest) of
+    DiffMin = diff_min(CurNode, GoalNode),
+    case is_in_direction(CurNode, GoalNode, northwest) andalso abs(Distance) >= DiffMin of
         true ->
-            search(Dirs, CurNode, GoalNode, JpsMod, [GoalNode|Success]);
+            NewSuccess = #node{x = CurNode#node.x - DiffMin, y = CurNode#node.y - DiffMin},
+            search(Dirs, CurNode, GoalNode, JpsMod, [NewSuccess|Success]);
         false ->
             case Distance > 0 of
                 true ->
@@ -368,9 +376,11 @@ search([northwest|Dirs], CurNode, GoalNode, JpsMod, Success) ->
     end;
 search([southeast|Dirs], CurNode, GoalNode, JpsMod, Success) ->
     Distance = get_distance_value(JpsMod, CurNode, southeast),
-    case is_in_direction(CurNode, GoalNode, Distance, southeast) of
+    DiffMin = diff_min(CurNode, GoalNode),
+    case is_in_direction(CurNode, GoalNode, southeast) andalso abs(Distance) >= DiffMin of
         true ->
-            search(Dirs, CurNode, GoalNode, JpsMod, [GoalNode|Success]);
+            NewSuccess = #node{x = CurNode#node.x + DiffMin, y = CurNode#node.y + DiffMin},
+            search(Dirs, CurNode, GoalNode, JpsMod, [NewSuccess|Success]);
         false ->
             case Distance > 0 of
                 true ->
@@ -382,9 +392,11 @@ search([southeast|Dirs], CurNode, GoalNode, JpsMod, Success) ->
     end;
 search([southwest|Dirs], CurNode, GoalNode, JpsMod, Success) ->
     Distance = get_distance_value(JpsMod, CurNode, southwest),
-    case is_in_direction(CurNode, GoalNode, Distance, southwest) of
+    DiffMin = diff_min(CurNode, GoalNode),
+    case is_in_direction(CurNode, GoalNode, southwest) andalso abs(Distance) >= DiffMin of
         true ->
-            search(Dirs, CurNode, GoalNode, JpsMod, [GoalNode|Success]);
+            NewSuccess = #node{x = CurNode#node.x - DiffMin, y = CurNode#node.y + DiffMin},
+            search(Dirs, CurNode, GoalNode, JpsMod, [NewSuccess|Success]);
         false ->
             case Distance > 0 of
                 true ->
@@ -403,22 +415,22 @@ diff_row(#node{y = Y1}, #node{y = Y2}) -> abs(Y1 - Y2).
 
 get_distance_value(JpsMod, #node{x = X, y= Y}, Dir) -> JpsMod:distance({X, Y}, Dir).
 
-is_in_direction(CurNode, GoalNode, Distance, east) ->
-    CurNode#node.y == GoalNode#node.y andalso GoalNode#node.x > CurNode#node.x andalso abs(Distance) >= diff_col(CurNode, GoalNode);
-is_in_direction(CurNode, GoalNode, Distance, west) ->
-    CurNode#node.y == GoalNode#node.y andalso GoalNode#node.x < CurNode#node.x andalso abs(Distance) >= diff_col(CurNode, GoalNode);
-is_in_direction(CurNode, GoalNode, Distance, south) ->
-    CurNode#node.x == GoalNode#node.x andalso GoalNode#node.y > CurNode#node.y andalso abs(Distance) >= diff_row(CurNode, GoalNode);
-is_in_direction(CurNode, GoalNode, Distance, north) ->
-    CurNode#node.x == GoalNode#node.x andalso GoalNode#node.y < CurNode#node.y andalso abs(Distance) >= diff_row(CurNode, GoalNode);
-is_in_direction(CurNode, GoalNode, Distance, northeast) ->
-    GoalNode#node.x > CurNode#node.x andalso CurNode#node.y > GoalNode#node.y andalso abs(Distance) >= diff_min(CurNode, GoalNode);
-is_in_direction(CurNode, GoalNode, Distance, northwest) ->
-    GoalNode#node.x < CurNode#node.x andalso CurNode#node.y > GoalNode#node.y andalso abs(Distance) >= diff_min(CurNode, GoalNode);
-is_in_direction(CurNode, GoalNode, Distance, southeast) ->
-    GoalNode#node.x > CurNode#node.x andalso CurNode#node.y < GoalNode#node.y andalso abs(Distance) >= diff_min(CurNode, GoalNode);
-is_in_direction(CurNode, GoalNode, Distance, southwest) ->
-    GoalNode#node.x < CurNode#node.x andalso CurNode#node.y < GoalNode#node.y andalso abs(Distance) >= diff_min(CurNode, GoalNode).
+is_in_direction(CurNode, GoalNode, east) ->
+    CurNode#node.y == GoalNode#node.y andalso GoalNode#node.x > CurNode#node.x;
+is_in_direction(CurNode, GoalNode, west) ->
+    CurNode#node.y == GoalNode#node.y andalso GoalNode#node.x < CurNode#node.x;
+is_in_direction(CurNode, GoalNode, south) ->
+    CurNode#node.x == GoalNode#node.x andalso GoalNode#node.y > CurNode#node.y;
+is_in_direction(CurNode, GoalNode, north) ->
+    CurNode#node.x == GoalNode#node.x andalso GoalNode#node.y < CurNode#node.y;
+is_in_direction(CurNode, GoalNode, northeast) ->
+    GoalNode#node.x > CurNode#node.x andalso CurNode#node.y > GoalNode#node.y;
+is_in_direction(CurNode, GoalNode, northwest) ->
+    GoalNode#node.x < CurNode#node.x andalso CurNode#node.y > GoalNode#node.y;
+is_in_direction(CurNode, GoalNode, southeast) ->
+    GoalNode#node.x > CurNode#node.x andalso CurNode#node.y < GoalNode#node.y;
+is_in_direction(CurNode, GoalNode, southwest) ->
+    GoalNode#node.x < CurNode#node.x andalso CurNode#node.y < GoalNode#node.y.
 
 write_file(FileName, Data) ->
     file:write_file(FileName, unicode:characters_to_binary(Data), [append]).
