@@ -6,7 +6,7 @@
 -module(flow_field).
 -author('ZhengJia <zj952067409@163.com>').
 %% API
--export([init/1, init_csv/1, write_csv/0, update/4, search/2]).
+-export([init/2, init_csv/2, write_csv/0, update/4, search/2]).
 
 -record(node, {
                x = 0,
@@ -15,14 +15,10 @@
                s = true
               }).
 
-is_walk_grid(X, Y) ->
-    DataMod = erlang:get(data_mod),
-    not DataMod:is_bar({X, Y}).
-
 pos2node({X, Y}) ->
     #node{x = X, y = Y}.
 
-init(End) ->
+init(End, MapMod) ->
     [{IndexX, IndexY}] = pos_2d:pos2index(End, 60, 1),
     IndexList = [{IndexX + AddX, IndexY + AddY}||AddX <- [-2,-1,0,1,2,3], AddY <- [0,-1], IndexX + AddX >= 0, IndexY + AddY >= 0],
     OpenGbSets = gb_sets:new(),
@@ -33,25 +29,25 @@ init(End) ->
         end,
     OpenGbSets1 = lists:foldl(F, OpenGbSets, IndexList),
     VisitedSets = sets:from_list(IndexList),
-    do_init(OpenGbSets1, ClosedDict, VisitedSets).
+    do_init(OpenGbSets1, ClosedDict, VisitedSets, MapMod).
 
-init_csv(End) ->
-    init(End),
+init_csv(End, MapMod) ->
+    init(End, MapMod),
     write_csv().
 
 write_csv() ->
-    D = erlang:get(pf),
-    file:delete("pf.csv"),
+    D = erlang:get(ff),
+    file:delete("ff.csv"),
     Str = [io_lib:format("~p", [X])||X <- lists:seq(0, 70)],
     S = string:join(["////////"|Str], ","),
-    file:write_file("pf.csv", S++"\n", [append]),
+    file:write_file("ff.csv", S++"\n", [append]),
     write_csv(0, 0, D, [io_lib:format("~p", [0])]).
 
 write_csv(71, 61, _, _) ->
     ok;
 write_csv(71, Y, D, Str) ->
     S = string:join(Str, ","),
-    file:write_file("pf.csv", S++"\n", [append]),
+    file:write_file("ff.csv", S++"\n", [append]),
     write_csv(0, Y+1, D, [io_lib:format("~p", [Y+1])]);
 write_csv(X, Y, D, Str) ->
     case dict:find({X, Y}, D) of
@@ -62,7 +58,7 @@ write_csv(X, Y, D, Str) ->
     write_csv(X+1, Y, D, Str1).
 
 update(Index, State, H, D) ->
-    ClosedDict = erlang:get(pf),
+    ClosedDict = erlang:get(ff),
     case dict:find(Index, ClosedDict) of
         {ok, #node{g=G} = Node} ->
             Count = trunc(abs(H) / D) - 1,
@@ -80,14 +76,14 @@ update(Index, State, H, D) ->
             ClosedDict7 = do_update(Index, Count, H, D, northwest, ClosedDict6),
             ClosedDict8 = do_update(Index, Count, H, D, southeast, ClosedDict7),
             ClosedDict9 = do_update(Index, Count, H, D, southwest, ClosedDict8),
-            erlang:put(pf, ClosedDict9);
+            erlang:put(ff, ClosedDict9);
         _ ->
             none
     end.
 
 search(Pos, Direction) ->
     [Index|Indexs] = pos_2d:pos2index(Pos, 60, 3),
-    ClosedDict = erlang:get(pf),
+    ClosedDict = erlang:get(ff),
     case dict:find(Index, ClosedDict) of
         {ok, CurNode} ->
             case do_search(Indexs, CurNode, ClosedDict, Direction) of
@@ -100,10 +96,10 @@ search(Pos, Direction) ->
             none
     end.
 
-do_init(OpenGbTree, ClosedDict, VisitedSets) ->
+do_init(OpenGbTree, ClosedDict, VisitedSets, MapMod) ->
     case dequeue_cheapest_node(OpenGbTree) of
         none -> %% no other node
-            erlang:put(pf, ClosedDict);
+            erlang:put(ff, ClosedDict);
         {ok, OpenGbTree0, CurrentNode} ->
             %% move currentNode from open to closed
             ClosedDict0 = push_closed_node(CurrentNode, ClosedDict),
@@ -111,18 +107,19 @@ do_init(OpenGbTree, ClosedDict, VisitedSets) ->
             %% NeighborsNodes = neighbors_nodes(diagonal, CurrentNode),
             NeighborsNodes = pos_2d:pos2index({CurrentNode#node.x, CurrentNode#node.y}, 1, 3),
             %% push neighbors if node validity
-            {OpenGbTree1, ClosedDict1, VisitedSets0} = push_neighbors(NeighborsNodes, CurrentNode, OpenGbTree0, ClosedDict0, VisitedSets),
+            {OpenGbTree1, ClosedDict1, VisitedSets0} = push_neighbors(NeighborsNodes, CurrentNode, OpenGbTree0,
+                                                                      ClosedDict0, VisitedSets, MapMod),
             %% tail recursion
-            do_init(OpenGbTree1, ClosedDict1, VisitedSets0)
+            do_init(OpenGbTree1, ClosedDict1, VisitedSets0, MapMod)
     end.
 
 %% 获取相邻的node
-push_neighbors([], _CurrentNode, OpenGbSets, ClosedDict, VisitedSets) ->
+push_neighbors([], _CurrentNode, OpenGbSets, ClosedDict, VisitedSets, _MapMod) ->
     {OpenGbSets, ClosedDict, VisitedSets};
-push_neighbors([{X, Y}|T], CurrentNode, OpenGbSets, ClosedDict, VisitedSets) ->
+push_neighbors([{X, Y}|T], CurrentNode, OpenGbSets, ClosedDict, VisitedSets, MapMod) ->
     case is_closed(X, Y, ClosedDict) of
         true ->
-            push_neighbors(T, CurrentNode, OpenGbSets, ClosedDict, VisitedSets);
+            push_neighbors(T, CurrentNode, OpenGbSets, ClosedDict, VisitedSets, MapMod);
         false ->
             NeighborsNode = pos2node({X, Y}),
             G = CurrentNode#node.g + g(NeighborsNode, CurrentNode),
@@ -130,17 +127,17 @@ push_neighbors([{X, Y}|T], CurrentNode, OpenGbSets, ClosedDict, VisitedSets) ->
             case sets:is_element({X, Y}, VisitedSets) of
                 true -> %% 已经寻到过的点，更新open列表node
                     OpenGbSets0 = rescore_open_node(NeighborsNode0, OpenGbSets),
-                    push_neighbors(T, CurrentNode, OpenGbSets0, ClosedDict, VisitedSets);
+                    push_neighbors(T, CurrentNode, OpenGbSets0, ClosedDict, VisitedSets, MapMod);
                 false ->
-                    case is_walk_grid(X, Y) of
+                    case not MapMod:is(bar, {X, Y}) of
                         true ->
                             OpenGbSets0 = push_open_nodes(NeighborsNode0, OpenGbSets),
                             VisitedSets0 = sets:add_element({X, Y}, VisitedSets),
-                            push_neighbors(T, CurrentNode, OpenGbSets0, ClosedDict, VisitedSets0);
+                            push_neighbors(T, CurrentNode, OpenGbSets0, ClosedDict, VisitedSets0, MapMod);
                         false ->
                             NeighborsNode1 = NeighborsNode0#node{g = 255, s = false},
                             ClosedDict0 = push_closed_node(NeighborsNode1, ClosedDict),
-                            push_neighbors(T, CurrentNode, OpenGbSets, ClosedDict0, VisitedSets)
+                            push_neighbors(T, CurrentNode, OpenGbSets, ClosedDict0, VisitedSets, MapMod)
                     end
             end
     end.

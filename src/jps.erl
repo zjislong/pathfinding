@@ -19,18 +19,18 @@
 %%====================================================================
 %% API functions
 %%====================================================================
-make(DataMod, W, H) ->
-    TarFile = "./data/"++atom_to_list(DataMod)++"_jps.erl",
-    make_east({W - 1, 0}, {W, H}, -1, false, DataMod),
-    make_west({0, 0}, {W, H}, -1, false, DataMod),
-    make_south({0, H - 1}, {W, H}, -1, false, DataMod),
-    make_north({0, 0}, {W, H}, -1, false, DataMod),
-    make_northeast({W - 1, 0}, {W, H}, DataMod),
-	make_northwest({0, 0}, {W, H}, DataMod),
-    make_southeast({W - 1, H - 1}, {W, H}, DataMod),
-	make_southwest({0, H - 1}, {W, H}, DataMod),
+make(MapMod, W, H) ->
+    TarFile = "./data/"++atom_to_list(MapMod)++"_jps.erl",
+    make_east({W - 1, 0}, {W, H}, -1, false, MapMod),
+    make_west({0, 0}, {W, H}, -1, false, MapMod),
+    make_south({0, H - 1}, {W, H}, -1, false, MapMod),
+    make_north({0, 0}, {W, H}, -1, false, MapMod),
+    make_northeast({W - 1, 0}, {W, H}, MapMod),
+	make_northwest({0, 0}, {W, H}, MapMod),
+    make_southeast({W - 1, H - 1}, {W, H}, MapMod),
+	make_southwest({0, H - 1}, {W, H}, MapMod),
     file:delete(TarFile),
-    write_file(TarFile, "-module("++atom_to_list(DataMod)++"_jps).
+    write_file(TarFile, "-module("++atom_to_list(MapMod)++"_jps).
 -export([distance/2]).
 "),
     LayerDataStr = ["distance({"++integer_to_list(X)++","++integer_to_list(Y)++"}, "++atom_to_list(Dir)++") -> "++integer_to_list(D)||{{{X, Y}, Dir}, D}<-get()],
@@ -68,97 +68,97 @@ search(CurNode, GoalNode, JpsMod) ->
 %% Internal functions
 %%====================================================================
 make_east({_, Y}, {_, H}, _, _, _) when Y >= H -> ok;
-make_east({X, Y}, {W, H}, _, _, JpsMod) when X < 0 ->
-    make_east({W - 1, Y + 1}, {W, H}, -1, false, JpsMod);
-make_east({X, Y}, {W, H}, Count, MeetJP, JpsMod) ->
-    case JpsMod:is_bar({X, Y}) of
+make_east({X, Y}, {W, H}, _, _, MapMod) when X < 0 ->
+    make_east({W - 1, Y + 1}, {W, H}, -1, false, MapMod);
+make_east({X, Y}, {W, H}, Count, MeetJP, MapMod) ->
+    case MapMod:is(bar, {X, Y}) of
         true ->
             put({{X, Y}, east}, 0),
-            make_east({X - 1, Y}, {W, H}, -1, false, JpsMod);
+            make_east({X - 1, Y}, {W, H}, -1, false, MapMod);
         false ->
             Count1 = Count + 1,
             case MeetJP of
                 true -> put({{X, Y}, east}, Count1);
                 false -> put({{X, Y}, east}, -Count1)
             end,
-            case is_jp({X, Y}, east, JpsMod) of
-                true -> make_east({X - 1, Y}, {W, H}, 0, true, JpsMod);
-                false -> make_east({X - 1, Y}, {W, H}, Count1, MeetJP, JpsMod)
+            case is_jp({X, Y}, east, MapMod) of
+                true -> make_east({X - 1, Y}, {W, H}, 0, true, MapMod);
+                false -> make_east({X - 1, Y}, {W, H}, Count1, MeetJP, MapMod)
             end
     end.
 
 make_west({_, Y}, {_, H}, _, _, _) when Y >= H -> ok;
-make_west({X, Y}, {W, H}, _, _, JpsMod) when X >= W ->
-    make_west({0, Y + 1}, {W, H}, -1, false, JpsMod);
-make_west({X, Y}, {W, H}, Count, MeetJP, JpsMod) ->
-    case JpsMod:is_bar({X, Y}) of
+make_west({X, Y}, {W, H}, _, _, MapMod) when X >= W ->
+    make_west({0, Y + 1}, {W, H}, -1, false, MapMod);
+make_west({X, Y}, {W, H}, Count, MeetJP, MapMod) ->
+    case MapMod:is(bar, {X, Y}) of
         true ->
             put({{X, Y}, west}, 0),
-            make_west({X + 1, Y}, {W, H}, -1, false, JpsMod);
+            make_west({X + 1, Y}, {W, H}, -1, false, MapMod);
         false ->
             Count1 = Count + 1,
             case MeetJP of
                 true -> put({{X, Y}, west}, Count1);
                 false -> put({{X, Y}, west}, -Count1)
             end,
-            case is_jp({X, Y}, west, JpsMod) of
-                true -> make_west({X + 1, Y}, {W, H}, 0, true, JpsMod);
-                false -> make_west({X + 1, Y}, {W, H}, Count1, MeetJP, JpsMod)
+            case is_jp({X, Y}, west, MapMod) of
+                true -> make_west({X + 1, Y}, {W, H}, 0, true, MapMod);
+                false -> make_west({X + 1, Y}, {W, H}, Count1, MeetJP, MapMod)
             end
     end.
 
 make_south({X, _}, {W, _}, _, _, _) when X >= W -> ok;
-make_south({X, Y}, {W, H}, _, _, JpsMod) when Y < 0 ->
-    make_south({X + 1, H - 1}, {W, H}, -1, false, JpsMod);
-make_south({X, Y}, {W, H}, Count, MeetJP, JpsMod) ->
-    case JpsMod:is_bar({X, Y}) of
+make_south({X, Y}, {W, H}, _, _, MapMod) when Y < 0 ->
+    make_south({X + 1, H - 1}, {W, H}, -1, false, MapMod);
+make_south({X, Y}, {W, H}, Count, MeetJP, MapMod) ->
+    case MapMod:is(bar, {X, Y}) of
         true ->
             put({{X, Y}, south}, 0),
-            make_south({X, Y - 1}, {W, H}, -1, false, JpsMod);
+            make_south({X, Y - 1}, {W, H}, -1, false, MapMod);
         false ->
             Count1 = Count + 1,
             case MeetJP of
                 true -> put({{X, Y}, south}, Count1);
                 false -> put({{X, Y}, south}, -Count1)
             end,
-            case is_jp({X, Y}, south, JpsMod) of
-                true -> make_south({X, Y - 1}, {W, H}, 0, true, JpsMod);
-                false -> make_south({X, Y - 1}, {W, H}, Count1, MeetJP, JpsMod)
+            case is_jp({X, Y}, south, MapMod) of
+                true -> make_south({X, Y - 1}, {W, H}, 0, true, MapMod);
+                false -> make_south({X, Y - 1}, {W, H}, Count1, MeetJP, MapMod)
             end
     end.
 
 make_north({X, _}, {W, _}, _, _, _) when X >= W  -> ok;
-make_north({X, Y}, {W, H}, _, _, JpsMod) when Y >= H ->
-    make_north({X + 1, 0}, {W, H}, -1, false, JpsMod);
-make_north({X, Y}, {W, H}, Count, MeetJP, JpsMod) ->
-    case JpsMod:is_bar({X, Y}) of
+make_north({X, Y}, {W, H}, _, _, MapMod) when Y >= H ->
+    make_north({X + 1, 0}, {W, H}, -1, false, MapMod);
+make_north({X, Y}, {W, H}, Count, MeetJP, MapMod) ->
+    case MapMod:is(bar, {X, Y}) of
         true ->
             put({{X, Y}, north}, 0),
-            make_north({X, Y + 1}, {W, H}, -1, false, JpsMod);
+            make_north({X, Y + 1}, {W, H}, -1, false, MapMod);
         false ->
             Count1 = Count + 1,
             case MeetJP of
                 true -> put({{X, Y}, north}, Count1);
                 false -> put({{X, Y}, north}, -Count1)
             end,
-            case is_jp({X, Y}, north, JpsMod) of
-                true -> make_north({X, Y + 1}, {W, H}, 0, true, JpsMod);
-                false -> make_north({X, Y + 1}, {W, H}, Count1, MeetJP, JpsMod)
+            case is_jp({X, Y}, north, MapMod) of
+                true -> make_north({X, Y + 1}, {W, H}, 0, true, MapMod);
+                false -> make_north({X, Y + 1}, {W, H}, Count1, MeetJP, MapMod)
             end
     end.
 
 make_northeast({_, Y}, {_, H}, _) when Y >= H -> ok;
-make_northeast({X, Y}, {W, H}, JpsMod) when X < 0 ->
-    make_northeast({W - 1, Y + 1}, {W, H}, JpsMod);
-make_northeast({X, Y} = Pos, {W, H}, JpsMod) ->
-    case JpsMod:is_bar(Pos) of
-        true -> make_northeast({X - 1, Y}, {W, H}, JpsMod);
+make_northeast({X, Y}, {W, H}, MapMod) when X < 0 ->
+    make_northeast({W - 1, Y + 1}, {W, H}, MapMod);
+make_northeast({X, Y} = Pos, {W, H}, MapMod) ->
+    case MapMod:is(bar, Pos) of
+        true -> make_northeast({X - 1, Y}, {W, H}, MapMod);
         false ->
-            Condition1 = JpsMod:is_bar({X + 1, Y}) orelse
-                         JpsMod:is_bar({X, Y - 1}) orelse
-                         JpsMod:is_bar({X + 1, Y - 1}),
-            Condition2 = not JpsMod:is_bar({X + 1, Y}) andalso
-                             not JpsMod:is_bar({X, Y - 1}) andalso
+            Condition1 = MapMod:is(bar, {X + 1, Y}) orelse
+                         MapMod:is(bar, {X, Y - 1}) orelse
+                         MapMod:is(bar, {X + 1, Y - 1}),
+            Condition2 = not MapMod:is(bar, {X + 1, Y}) andalso
+                             not MapMod:is(bar, {X, Y - 1}) andalso
                                  (get({{X + 1, Y - 1}, north}) > 0 orelse
                                   get({{X + 1, Y - 1}, east}) > 0),
             if Condition1 -> put({Pos, northeast}, 0);
@@ -170,21 +170,21 @@ make_northeast({X, Y} = Pos, {W, H}, JpsMod) ->
                         false -> put({Pos, northeast}, Increment - 1)
                     end
             end,
-            make_northeast({X - 1, Y}, {W, H}, JpsMod)
+            make_northeast({X - 1, Y}, {W, H}, MapMod)
     end.
 
 make_northwest({_, Y}, {_, H}, _) when Y >= H -> ok;
-make_northwest({X, Y}, {W, H}, JpsMod) when X >= W ->
-    make_northwest({0, Y + 1}, {W, H}, JpsMod);
-make_northwest({X, Y} = Pos, {W, H}, JpsMod) ->
-    case JpsMod:is_bar(Pos) of
-        true -> make_northwest({X + 1, Y}, {W, H}, JpsMod);
+make_northwest({X, Y}, {W, H}, MapMod) when X >= W ->
+    make_northwest({0, Y + 1}, {W, H}, MapMod);
+make_northwest({X, Y} = Pos, {W, H}, MapMod) ->
+    case MapMod:is(bar, Pos) of
+        true -> make_northwest({X + 1, Y}, {W, H}, MapMod);
         false ->
-            Condition1 = JpsMod:is_bar({X - 1, Y}) orelse
-                         JpsMod:is_bar({X, Y - 1}) orelse
-                         JpsMod:is_bar({X - 1, Y - 1}),
-            Condition2 = not JpsMod:is_bar({X - 1, Y}) andalso
-                             not JpsMod:is_bar({X, Y - 1}) andalso
+            Condition1 = MapMod:is(bar, {X - 1, Y}) orelse
+                         MapMod:is(bar, {X, Y - 1}) orelse
+                         MapMod:is(bar, {X - 1, Y - 1}),
+            Condition2 = not MapMod:is(bar, {X - 1, Y}) andalso
+                             not MapMod:is(bar, {X, Y - 1}) andalso
                                  (get({{X - 1, Y - 1}, north}) > 0 orelse
                                   get({{X - 1, Y - 1}, west}) > 0),
             if Condition1 -> put({Pos, northwest}, 0);
@@ -196,21 +196,21 @@ make_northwest({X, Y} = Pos, {W, H}, JpsMod) ->
                         false -> put({Pos, northwest}, Increment - 1)
                     end
             end,
-            make_northwest({X + 1, Y}, {W, H}, JpsMod)
+            make_northwest({X + 1, Y}, {W, H}, MapMod)
     end.
 
 make_southeast({_, Y}, _, _) when Y < 0 -> ok;
-make_southeast({X, Y}, {W, H}, JpsMod) when X < 0 ->
-    make_southeast({W - 1, Y - 1}, {W, H}, JpsMod);
-make_southeast({X, Y} = Pos, {W, H}, JpsMod) ->
-    case JpsMod:is_bar(Pos) of
-        true -> make_southeast({X - 1, Y}, {W, H}, JpsMod);
+make_southeast({X, Y}, {W, H}, MapMod) when X < 0 ->
+    make_southeast({W - 1, Y - 1}, {W, H}, MapMod);
+make_southeast({X, Y} = Pos, {W, H}, MapMod) ->
+    case MapMod:is(bar, Pos) of
+        true -> make_southeast({X - 1, Y}, {W, H}, MapMod);
         false ->
-            Condition1 = JpsMod:is_bar({X + 1, Y}) orelse
-                         JpsMod:is_bar({X, Y + 1}) orelse
-                         JpsMod:is_bar({X + 1, Y + 1}),
-            Condition2 = not JpsMod:is_bar({X + 1, Y}) andalso
-                             not JpsMod:is_bar({X, Y + 1}) andalso
+            Condition1 = MapMod:is(bar, {X + 1, Y}) orelse
+                         MapMod:is(bar, {X, Y + 1}) orelse
+                         MapMod:is(bar, {X + 1, Y + 1}),
+            Condition2 = not MapMod:is(bar, {X + 1, Y}) andalso
+                             not MapMod:is(bar, {X, Y + 1}) andalso
                                  (get({{X + 1, Y + 1}, south}) > 0 orelse
                                   get({{X + 1, Y + 1}, east}) > 0),
             if Condition1 -> put({Pos, southeast}, 0);
@@ -222,21 +222,21 @@ make_southeast({X, Y} = Pos, {W, H}, JpsMod) ->
                         false -> put({Pos, southeast}, Increment - 1)
                     end
             end,
-            make_southeast({X - 1, Y}, {W, H}, JpsMod)
+            make_southeast({X - 1, Y}, {W, H}, MapMod)
     end.
 
 make_southwest({_, Y}, _, _) when Y < 0 -> ok;
-make_southwest({X, Y}, {W, H}, JpsMod) when X >= W ->
-    make_southwest({0, Y - 1}, {W, H}, JpsMod);
-make_southwest({X, Y} = Pos, {W, H}, JpsMod) ->
-    case JpsMod:is_bar(Pos) of
-        true -> make_southwest({X + 1, Y}, {W, H}, JpsMod);
+make_southwest({X, Y}, {W, H}, MapMod) when X >= W ->
+    make_southwest({0, Y - 1}, {W, H}, MapMod);
+make_southwest({X, Y} = Pos, {W, H}, MapMod) ->
+    case MapMod:is(bar, Pos) of
+        true -> make_southwest({X + 1, Y}, {W, H}, MapMod);
         false ->
-            Condition1 = JpsMod:is_bar({X - 1, Y}) orelse
-                         JpsMod:is_bar({X, Y + 1}) orelse
-                         JpsMod:is_bar({X - 1, Y + 1}),
-            Condition2 = not JpsMod:is_bar({X - 1, Y}) andalso
-                             not JpsMod:is_bar({X, Y + 1}) andalso
+            Condition1 = MapMod:is(bar, {X - 1, Y}) orelse
+                         MapMod:is(bar, {X, Y + 1}) orelse
+                         MapMod:is(bar, {X - 1, Y + 1}),
+            Condition2 = not MapMod:is(bar, {X - 1, Y}) andalso
+                             not MapMod:is(bar, {X, Y + 1}) andalso
                                  (get({{X - 1, Y + 1}, south}) > 0 orelse
                                   get({{X - 1, Y + 1}, west}) > 0),
             if Condition1 -> put({Pos, southwest}, 0);
@@ -248,29 +248,29 @@ make_southwest({X, Y} = Pos, {W, H}, JpsMod) ->
                         false -> put({Pos, southwest}, Increment - 1)
                     end
             end,
-            make_southwest({X + 1, Y}, {W, H}, JpsMod)
+            make_southwest({X + 1, Y}, {W, H}, MapMod)
     end.
 
-is_jp({X, Y}, east, JpsMod) ->
-    not JpsMod:is_bar({X - 1, Y}) andalso
-        ((JpsMod:is_bar({X - 1, Y + 1}) andalso not JpsMod:is_bar({X, Y + 1}))
+is_jp({X, Y}, east, MapMod) ->
+    not MapMod:is(bar, {X - 1, Y}) andalso
+        ((MapMod:is(bar, {X - 1, Y + 1}) andalso not MapMod:is(bar, {X, Y + 1}))
          orelse
-         (JpsMod:is_bar({X - 1, Y - 1}) andalso not JpsMod:is_bar({X, Y - 1})));
-is_jp({X, Y}, west, JpsMod) ->
-    not JpsMod:is_bar({X + 1, Y}) andalso
-        ((JpsMod:is_bar({X + 1, Y + 1}) andalso not JpsMod:is_bar({X, Y + 1}))
+         (MapMod:is(bar, {X - 1, Y - 1}) andalso not MapMod:is(bar, {X, Y - 1})));
+is_jp({X, Y}, west, MapMod) ->
+    not MapMod:is(bar, {X + 1, Y}) andalso
+        ((MapMod:is(bar, {X + 1, Y + 1}) andalso not MapMod:is(bar, {X, Y + 1}))
          orelse
-         (JpsMod:is_bar({X + 1, Y - 1}) andalso not JpsMod:is_bar({X, Y - 1})));
-is_jp({X, Y}, south, JpsMod) ->
-    not JpsMod:is_bar({X, Y - 1}) andalso
-        ((JpsMod:is_bar({X - 1, Y - 1}) andalso not JpsMod:is_bar({X - 1, Y}))
+         (MapMod:is(bar, {X + 1, Y - 1}) andalso not MapMod:is(bar, {X, Y - 1})));
+is_jp({X, Y}, south, MapMod) ->
+    not MapMod:is(bar, {X, Y - 1}) andalso
+        ((MapMod:is(bar, {X - 1, Y - 1}) andalso not MapMod:is(bar, {X - 1, Y}))
          orelse
-         (JpsMod:is_bar({X + 1, Y - 1}) andalso not JpsMod:is_bar({X + 1, Y})));
-is_jp({X, Y}, north, JpsMod) ->
-    not JpsMod:is_bar({X, Y + 1}) andalso
-        ((JpsMod:is_bar({X - 1, Y + 1}) andalso not JpsMod:is_bar({X - 1, Y}))
+         (MapMod:is(bar, {X + 1, Y - 1}) andalso not MapMod:is(bar, {X + 1, Y})));
+is_jp({X, Y}, north, MapMod) ->
+    not MapMod:is(bar, {X, Y + 1}) andalso
+        ((MapMod:is(bar, {X - 1, Y + 1}) andalso not MapMod:is(bar, {X - 1, Y}))
          orelse
-         (JpsMod:is_bar({X + 1, Y + 1}) andalso not JpsMod:is_bar({X + 1, Y}))).
+         (MapMod:is(bar, {X + 1, Y + 1}) andalso not MapMod:is(bar, {X + 1, Y}))).
 
 dir_lookup(south) -> [west, southwest, south, southeast, east];
 dir_lookup(southeast) -> [south, southeast, east];

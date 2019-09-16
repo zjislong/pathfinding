@@ -18,18 +18,18 @@ decode(MapMod, SrcFile, LayerOptions) ->
     file:delete(TarFile),
     case file:read_file(SrcFile) of
         {ok, Bin} ->
-            {ok, JsonData, _} = rfc4627:decode(Bin),
-            {ok, Layers} = rfc4627:get_field(JsonData, "layers"),
-            {ok, W} = rfc4627:get_field(JsonData, "width"),
-            {ok, H} = rfc4627:get_field(JsonData, "height"),
-            {ok, S} = rfc4627:get_field(JsonData, "tilewidth"),
-            write_file(TarFile, "-module("++MapMod++").\n-export([info/0,pos/1,is/2,id/2]).\n"),
-            write_file(TarFile, "info() -> {"++integer_to_list(W)++", "++integer_to_list(H)++"}.\n"),
-            {PosString, IsString, IdString} = decode_layers(W, H, S, Layers, LayerOptions),
-            write_file(TarFile, PosString),
-            write_file(TarFile, IsString),
-            write_file(TarFile, IdString),
-            ok;
+            case jsx:decode(Bin, [return_maps]) of
+                #{<<"width">> := W, <<"height">> := H, <<"tilewidth">> := S, <<"layers">> := Layers} ->
+                write_file(TarFile, "-module("++MapMod++").\n-export([info/0,pos/1,is/2,id/2]).\n"),
+                write_file(TarFile, "info() -> {"++integer_to_list(W)++", "++integer_to_list(H)++"}.\n"),
+                {PosString, IsString, IdString} = decode_layers(W, H, S, Layers, LayerOptions),
+                write_file(TarFile, PosString),
+                write_file(TarFile, IsString),
+                write_file(TarFile, IdString),
+                ok;
+            _ ->
+                error
+            end;
         _ ->
             error
     end.
@@ -37,30 +37,26 @@ decode(MapMod, SrcFile, LayerOptions) ->
 %% Internal functions
 %%====================================================================
 %%解析某一种场景元素的数据
-decode_layers(W, H, S, Layers, LayerOptions) -> 
+decode_layers(W, H, S, Layers, LayerOptions) ->
     decode_layers(W, H, S, Layers, LayerOptions, [], [], []).
 
 decode_layers(_, _, _, [], _LayerOptions, PosData, IsData, IdData) ->
-    PosString = string:join(PosData, ";\n") ++ ";\npos(_) -> [].\n",
-    IsString = string:join(IsData, ";\n") ++ ";\nis(_, _) -> false.\n",
-    IdString = string:join(IdData, ";\n") ++ ";\nid(_, _) -> 0.\n",
+    PosString = string:join(PosData, "\n") ++ "\npos(_) -> [].\n",
+    IsString = string:join(IsData, "\n") ++ "\nis(_, _) -> false.\n",
+    IdString = string:join(IdData, "\n") ++ "\nid(_, _) -> 0.\n",
     {PosString, IsString, IdString};
-decode_layers(W, H, S, [LayerJson|Layers], LayerOptions, PosData, IsData, IdData) ->
-    {ok, LayerName0} = rfc4627:get_field(LayerJson, "name"),
+decode_layers(W, H, S, [#{<<"name">> := LayerName0, <<"data">> := Data}|Layers], LayerOptions, PosData, IsData, IdData) ->
     LayerName = binary_to_list(LayerName0),
     case lists:keyfind(LayerName, 1, LayerOptions) of
         {_, pos_analyse, Offset} ->
-            {ok, Data} = rfc4627:get_field(LayerJson, "data"),
             PosList = pos_analyse(Data, W, S, Offset),
             String = pos_string(LayerName, PosList),
             decode_layers(W, H, S, Layers, LayerOptions, [String|PosData], IsData, IdData);
         {_, is_analyse} ->
-            {ok, Data} = rfc4627:get_field(LayerJson, "data"),
             Bin = is_analyse(Data, <<>>),
             String = is_string(LayerName, Bin, W, H),
             decode_layers(W, H, S, Layers, LayerOptions, PosData, [String|IsData], IdData);
         {_, id_analyse} ->
-            {ok, Data} = rfc4627:get_field(LayerJson, "data"),
             PosList = id_analyse(Data, 0, W, []),
             String = id_string(LayerName, PosList),
             decode_layers(W, H, S, Layers, LayerOptions, PosData, IsData, [String|IdData]);
@@ -82,7 +78,7 @@ pos_analyse([_|Data], W, S, {OffsetX, OffsetY}, Index, Res) ->
 
 pos_string(LayerName, PosList) ->
     PosList1 = ["{"++integer_to_list(X)++","++integer_to_list(Y)++"}"||{X, Y}<-PosList],
-    "pos("++LayerName++") ->\n    ["++string:join(PosList1, ",")++"]".
+    "pos("++LayerName++") ->\n    ["++string:join(PosList1, ",")++"];".
 
 is_analyse([], Bin) -> Bin;
 is_analyse([0|Data], Bin) -> is_analyse(Data, <<Bin/bits, 0:1>>);
@@ -149,15 +145,15 @@ is("++LayerName++", {X, Y}) ->
             true;
         _ ->
             false
-    end".
+    end;".
 
 id_string(LayerName, PosList) ->
     F = fun({X, Y}) ->
             ID = erlang:get({X, Y}),
-            "id("++LayerName++", {"++integer_to_list(X)++", "++integer_to_list(Y)++"}) -> "++integer_to_list(ID)
+            "id("++LayerName++", {"++integer_to_list(X)++", "++integer_to_list(Y)++"}) -> "++integer_to_list(ID)++";"
         end,
     LayerDataStr = [F(Pos)||Pos<-PosList],
-    string:join(LayerDataStr, ";\n").
+    string:join(LayerDataStr, "\n").
 
 write_file(FileName, Data) ->
     file:write_file(FileName, unicode:characters_to_binary(Data), [append]).

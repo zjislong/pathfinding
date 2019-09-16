@@ -6,7 +6,7 @@
 -module(astar).
 -author('ZhengJia <zj952067409@163.com>').
 %% API
--export([search/5]).
+-export([search/4]).
 
 -record(node, {
                x = 0,
@@ -19,16 +19,16 @@
 pos2node({X, Y}) ->
     #node{x = X, y = Y}.
 
-search(Start, End, MapMod, JpsMod, BarName) ->
+search(Start, End, MapMod, JpsMod) ->
     OpenGbSets = gb_sets:new(),
     ClosedDict = dict:new(),
     VisitedSets = sets:new(),
     StartNode = pos2node(Start),
     EndNode = pos2node(End),
     OpenGbSets0 = push_open_nodes(StartNode#node{g = 0, h = h(diagonal, StartNode, EndNode)}, OpenGbSets),
-    do_search(EndNode, OpenGbSets0, ClosedDict, VisitedSets, MapMod, JpsMod, BarName).
+    do_search(EndNode, OpenGbSets0, ClosedDict, VisitedSets, MapMod, JpsMod).
 
-do_search(EndNode, OpenGbTree, ClosedDict, VisitedSets, MapMod, JpsMod, BarName) ->
+do_search(EndNode, OpenGbTree, ClosedDict, VisitedSets, MapMod, JpsMod) ->
     case dequeue_cheapest_node(OpenGbTree) of
         none -> %% no other node
             none;
@@ -43,17 +43,19 @@ do_search(EndNode, OpenGbTree, ClosedDict, VisitedSets, MapMod, JpsMod, BarName)
                     %% NeighborsNodes = neighbors_nodes(diagonal, CurrentNode),
                     NeighborsNodes = jps:search(CurrentNode, EndNode, JpsMod),
                     %% push neighbors if node validity
-                    {OpenGbTree1, ClosedDict1, VisitedSets0} = push_neighbors(NeighborsNodes, EndNode, CurrentNode, diagonal, OpenGbTree0, ClosedDict0, VisitedSets, MapMod, BarName),
+                    {OpenGbTree1, ClosedDict1, VisitedSets0} = push_neighbors(NeighborsNodes, EndNode, CurrentNode,
+                                                                              diagonal, OpenGbTree0, ClosedDict0, VisitedSets,
+                                                                              MapMod),
                     %% tail recursion
-                    do_search(EndNode, OpenGbTree1, ClosedDict1, VisitedSets0, MapMod, JpsMod, BarName)
+                    do_search(EndNode, OpenGbTree1, ClosedDict1, VisitedSets0, MapMod, JpsMod)
             end
     end.
 
 %% 获取相邻的node
-push_neighbors([], _EndNode, _CurrentNode, _HeuristicsType, OpenGbSets, ClosedDict, VisitedSets, _MapMod, _BarName) ->
+push_neighbors([], _EndNode, _CurrentNode, _HeuristicsType, OpenGbSets, ClosedDict, VisitedSets, _MapMod) ->
     {OpenGbSets, ClosedDict, VisitedSets};
-push_neighbors([NeighborsNode = #node{x = X, y = Y}|T], EndNode, CurrentNode, HeuristicsType, OpenGbSets, ClosedDict, VisitedSets, MapMod, BarName) ->
-    case is_walk_grid(MapMod, BarName, {X, Y}) andalso not is_closed(X, Y, ClosedDict) of
+push_neighbors([NeighborsNode = #node{x = X, y = Y}|T], EndNode, CurrentNode, HeuristicsType, OpenGbSets, ClosedDict, VisitedSets, MapMod) ->
+    case not MapMod:is(bar, {X, Y}) andalso not is_closed(X, Y, ClosedDict) of
         true -> %% 可行走点，没有在closed列表
             %% 计算子节点G值 = 父节点G值 + G值开销
             G = CurrentNode#node.g + g(NeighborsNode, CurrentNode),
@@ -63,14 +65,14 @@ push_neighbors([NeighborsNode = #node{x = X, y = Y}|T], EndNode, CurrentNode, He
             case sets:is_element({X, Y}, VisitedSets) of
                 true -> %% 已经寻到过的点，更新open列表node
                     OpenGbSets0 = rescore_open_node(NeighborsNode0, OpenGbSets),
-                    push_neighbors(T, EndNode, CurrentNode, HeuristicsType, OpenGbSets0, ClosedDict, VisitedSets, MapMod, BarName);
+                    push_neighbors(T, EndNode, CurrentNode, HeuristicsType, OpenGbSets0, ClosedDict, VisitedSets, MapMod);
                 false ->
                     OpenGbSets0 = push_open_nodes(NeighborsNode0, OpenGbSets),
                     VisitedSets0 = sets:add_element({X, Y}, VisitedSets),
-                    push_neighbors(T, EndNode, CurrentNode, HeuristicsType, OpenGbSets0, ClosedDict, VisitedSets0, MapMod, BarName)
+                    push_neighbors(T, EndNode, CurrentNode, HeuristicsType, OpenGbSets0, ClosedDict, VisitedSets0, MapMod)
             end;
         false ->
-            push_neighbors(T, EndNode, CurrentNode, HeuristicsType, OpenGbSets, ClosedDict, VisitedSets, MapMod, BarName)
+            push_neighbors(T, EndNode, CurrentNode, HeuristicsType, OpenGbSets, ClosedDict, VisitedSets, MapMod)
     end.
 
 %% 选择代价最小的点
@@ -148,12 +150,3 @@ g(#node{}, #node{}) -> 1.41421.
 %% @doc 判断是否是同一个点
 eq(#node{x = X, y = Y}, #node{x = X, y = Y}) -> true;
 eq(#node{}, #node{}) -> false.
-
-is_walk_grid(_, [], _) -> true;
-is_walk_grid(MapMod, [BarName|BarNames], Pos) ->
-    case MapMod:is(BarName, Pos) of
-        true ->
-            is_walk_grid(MapMod, BarNames, Pos);
-        false ->
-            false
-    end.
